@@ -1,4 +1,4 @@
-irbnb Clone Project
+Airbnb Clone Project
 This project aims to create a simplified version of the Airbnb platform, allowing users to manage properties, bookings, and users. It serves as a learning exercise for implementing various Python concepts and tools.
 
 Command Interpreter
