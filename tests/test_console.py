@@ -1,3 +1,4 @@
+Can't create, edit or upload … You don't have enough storage to create, edit and upload files. Get 100 GB of storage for ₦950.00 ₦240.00/month for 3 months.
 #!/usr/bin/python3
 """Defines unittests for console.py.
 
