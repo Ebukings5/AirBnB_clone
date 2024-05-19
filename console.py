@@ -1,211 +1,173 @@
-#!/usr/bin/python3
-"""Defines the HBnB console."""
+#!/usr/bin/env python3
+"""
+This module contains the entry point of the command interpreter for the AirBnB Clone project.
+"""
+
 import cmd
-import re
-from shlex import split
+import sys
 from models import storage
 from models.base_model import BaseModel
 from models.user import User
 from models.state import State
 from models.city import City
-from models.place import Place
 from models.amenity import Amenity
+from models.place import Place
 from models.review import Review
-
-
-def parse(arg):
-    curly_braces = re.search(r"\{(.*?)\}", arg)
-    brackets = re.search(r"\[(.*?)\]", arg)
-    if curly_braces is None:
-        if brackets is None:
-            return [i.strip(",") for i in split(arg)]
-        else:
-            lexer = split(arg[:brackets.span()[0]])
-            retl = [i.strip(",") for i in lexer]
-            retl.append(brackets.group())
-            return retl
-    else:
-        lexer = split(arg[:curly_braces.span()[0]])
-        retl = [i.strip(",") for i in lexer]
-        retl.append(curly_braces.group())
-        return retl
+import shlex
 
 
 class HBNBCommand(cmd.Cmd):
-    """Defines the HolbertonBnB command interpreter.
-
-    Attributes:
-        prompt (str): The command prompt.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.prompt = "(hbnb) "
-        self.__classes = {
-            "BaseModel",
-            "User",
-            "State",
-            "City",
-            "Place",
-            "Amenity",
-            "Review"
-        }
-
+    """Command interpreter for AirBnB Clone project."""
+    
+    prompt = "(hbnb) "
+    classes = {
+        "BaseModel": BaseModel, 
+        "User": User, 
+        "State": State, 
+        "City": City, 
+        "Amenity": Amenity, 
+        "Place": Place, 
+        "Review": Review
+    }
+    
     def emptyline(self):
-        """Do nothing upon receiving an empty line."""
+        """Called when an empty line is entered."""
         pass
-
-    def default(self, arg):
-        """Default behavior for cmd module when input is invalid"""
-        argdict = {
-            "all": self.do_all,
-            "show": self.do_show,
-            "destroy": self.do_destroy,
-            "count": self.do_count,
-            "update": self.do_update
-        }
-        match = re.search(r"\.", arg)
-        if match is not None:
-            argl = [arg[:match.span()[0]], arg[match.span()[1]:]]
-            match = re.search(r"\((.*?)\)", argl[1])
-            if match is not None:
-                command = [argl[1][:match.span()[0]], match.group()[1:-1]]
-                if command[0] in argdict.keys():
-                    call = "{} {}".format(argl[0], command[1])
-                    return argdict[command[0]](call)
-        print("* Unknown syntax: {}".format(arg))
-        return False
+    
+    def default(self, line):
+        """Called on an input line when the command prefix is not recognized."""
+        try:
+            cls_name, action = line.split(".", 1)
+            cls_name = cls_name.strip()
+            action = action.strip()
+            if cls_name in self.classes:
+                if "(" in action and ")" in action:
+                    method_name, args = action.split("(", 1)
+                    args = args[:-1].strip()
+                    if method_name == "all":
+                        self.do_all(f"{cls_name} {args}")
+                    elif method_name == "count":
+                        self.do_count(f"{cls_name} {args}")
+                    elif method_name == "show":
+                        self.do_show(f"{cls_name} {args}")
+                    elif method_name == "destroy":
+                        self.do_destroy(f"{cls_name} {args}")
+                    elif method_name == "update" and ',' in args:
+                        id_str, update_args = args.split(',', 1)
+                        self.do_update(f"{cls_name} {id_str.strip()} {update_args.strip()}")
+                    elif method_name == "update" and isinstance(eval(args), dict):
+                        id_str, update_args = args.split(',', 1)
+                        self.do_update(f"{cls_name} {id_str.strip()} {update_args.strip()}")
+                    else:
+                        print("** Unknown syntax: {}".format(action))
+                else:
+                    print("** Unknown syntax: {}".format(action))
+            else:
+                print("** class doesn't exist **")
+        except:
+            print("** Unknown syntax: {}".format(line))
 
     def do_quit(self, arg):
         """Quit command to exit the program."""
         return True
 
     def do_EOF(self, arg):
-        """EOF signal to exit the program."""
+        """EOF command to exit the program."""
         print("")
         return True
 
     def do_create(self, arg):
-        """Usage: create <class>
-        Create a new class instance and print its id.
-        """
-        argl = parse(arg)
-        if len(argl) == 0:
-            print("* class name missing *")
-        elif argl[0] not in self.__classes:
-            print("* class doesn't exist *")
+        """Create a new instance of BaseModel, save it to JSON file and print the id."""
+        if not arg:
+            print("** class name missing **")
+        elif arg in self.classes:
+            new_instance = self.classes[arg]()
+            new_instance.save()
+            print(new_instance.id)
         else:
-            print(eval(argl[0])().id)
-            storage.save()
+            print("** class doesn't exist **")
 
     def do_show(self, arg):
-        """Usage: show <class> <id> or <class>.show(<id>)
-        Display the string representation of a class instance of a given id.
-        """
-        argl = parse(arg)
-        objdict = storage.all()
-        if len(argl) == 0:
-            print("* class name missing *")
-        elif argl[0] not in self.__classes:
-            print("* class doesn't exist *")
-        elif len(argl) == 1:
-            print("* instance id missing *")
-        elif "{}.{}".format(argl[0], argl[1]) not in objdict:
-            print("* no instance found *")
+        """Show string representation of an instance based on the class name and id."""
+        args = shlex.split(arg)
+        if len(args) == 0:
+            print("** class name missing **")
+        elif args[0] not in self.classes:
+            print("** class doesn't exist **")
+        elif len(args) == 1:
+            print("** instance id missing **")
         else:
-            print(objdict["{}.{}".format(argl[0], argl[1])])
+            key = args[0] + "." + args[1]
+            try:
+                print(storage.all()[key])
+            except:
+                print("** no instance found **")
 
     def do_destroy(self, arg):
-        """Usage: destroy <class> <id> or <class>.destroy(<id>)
-        Delete a class instance of a given id."""
-        argl = parse(arg)
-        objdict = storage.all()
-        if len(argl) == 0:
-            print("* class name missing *")
-        elif argl[0] not in self.__classes:
-            print("* class doesn't exist *")
-        elif len(argl) == 1:
-            print("* instance id missing *")
-        elif "{}.{}".format(argl[0], argl[1]) not in objdict.keys():
-            print("* no instance found *")
+        """Delete an instance based on the class name and id."""
+        args = shlex.split(arg)
+        if len(args) == 0:
+            print("** class name missing **")
+        elif args[0] not in self.classes:
+            print("** class doesn't exist **")
+        elif len(args) == 1:
+            print("** instance id missing **")
         else:
-            del objdict["{}.{}".format(argl[0], argl[1])]
-            storage.save()
+            key = args[0] + "." + args[1]
+            try:
+                del storage.all()[key]
+                storage.save()
+            except:
+                print("** no instance found **")
 
     def do_all(self, arg):
-        """Usage: all or all <class> or <class>.all()
-        Display string representations of all instances of a given class.
-        If no class is specified, displays all instantiated objects."""
-        argl = parse(arg)
-        if len(argl) > 0 and argl[0] not in self.__classes:
-            print("* class doesn't exist *")
+        """Prints all string representation of all instances based or not on the class name."""
+        args = shlex.split(arg)
+        if len(args) == 0:
+            print([str(value) for key, value in storage.all().items()])
+        elif args[0] not in self.classes:
+            print("** class doesn't exist **")
         else:
-            objl = []
-            for obj in storage.all().values():
-                if len(argl) > 0 and argl[0] == obj._class.name_:
-                    objl.append(obj._str_())
-                elif len(argl) == 0:
-                    objl.append(obj._str_())
-            print(objl)
+            print([str(value) for key, value in storage.all().items() if key.split('.')[0] == args[0]])
 
     def do_count(self, arg):
-        """Usage: count <class> or <class>.count()
-        Retrieve the number of instances of a given class."""
-        argl = parse(arg)
-        count = 0
-        for obj in storage.all().values():
-            if argl[0] == obj._class.name_:
-                count += 1
-        print(count)
+        """Count the number of instances of a class."""
+        args = shlex.split(arg)
+        if len(args) == 0:
+            print("** class name missing **")
+        elif args[0] not in self.classes:
+            print("** class doesn't exist **")
+        else:
+            count = len([value for key, value in storage.all().items() if key.split('.')[0] == args[0]])
+            print(count)
 
     def do_update(self, arg):
-        """Usage: update <class> <id> <attribute_name> <attribute_value> or
-       <class>.update(<id>, <attribute_name>, <attribute_value>) or
-       <class>.update(<id>, <dictionary>)
-        Update a class instance of a given id by adding or updating
-        a given attribute key/value pair or dictionary."""
-        argl = parse(arg)
-        objdict = storage.all()
-
-        if len(argl) == 0:
-            print("* class name missing *")
-            return False
-        if argl[0] not in self.__classes:
-            print("* class doesn't exist *")
-            return False
-        if len(argl) == 1:
-            print("* instance id missing *")
-            return False
-        if "{}.{}".format(argl[0], argl[1]) not in objdict.keys():
-            print("* no instance found *")
-            return False
-        if len(argl) == 2:
-            print("* attribute name missing *")
-            return False
-        if len(argl) == 3:
+        """Update an instance based on the class name and id by adding or updating attribute."""
+        args = shlex.split(arg)
+        if len(args) == 0:
+            print("** class name missing **")
+        elif args[0] not in self.classes:
+            print("** class doesn't exist **")
+        elif len(args) == 1:
+            print("** instance id missing **")
+        elif len(args) == 2:
+            print("** attribute name missing **")
+        elif len(args) == 3:
+            print("** value missing **")
+        else:
+            key = args[0] + "." + args[1]
             try:
-                type(eval(argl[2])) != dict
-            except NameError:
-                print("* value missing *")
-                return False
+                instance = storage.all()[key]
+                attr = args[2]
+                val = args[3]
+                setattr(instance, attr, val)
+                instance.save()
+            except:
+                print("** no instance found **")
 
-        if len(argl) == 4:
-            obj = objdict["{}.{}".format(argl[0], argl[1])]
-            if argl[2] in obj._class.dict_.keys():
-                valtype = type(obj._class.dict_[argl[2]])
-                obj._dict_[argl[2]] = valtype(argl[3])
-            else:
-                obj._dict_[argl[2]] = argl[3]
-        elif type(eval(argl[2])) == dict:
-            obj = objdict["{}.{}".format(argl[0], argl[1])]
-            for k, v in eval(argl[2]).items():
-                if (k in obj._class.dict_.keys() and
-                        type(obj._class.dict_[k]) in {str, int, float}):
-                    valtype = type(obj._class.dict_[k])
-                    obj._dict_[k] = valtype(v)
-                else:
-                    obj._dict_[k] = v
-        storage.save()
+    def emptyline(self):
+        """Called when an empty line is entered."""
+        pass
 
 
 if __name__ == "__main__":
